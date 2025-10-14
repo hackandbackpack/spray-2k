@@ -92,10 +92,14 @@ function Get-DomainPath {
         if ([string]::IsNullOrWhiteSpace($DomainName)) {
             # Get current domain
             if ($Username -and $Password) {
-                $passwordPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
-                    [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Password)
-                )
-                $rootDSE = New-Object System.DirectoryServices.DirectoryEntry("LDAP://RootDSE", $Username, $passwordPlain)
+                $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Password)
+                try {
+                    $passwordPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
+                    $rootDSE = New-Object System.DirectoryServices.DirectoryEntry("LDAP://RootDSE", $Username, $passwordPlain)
+                } finally {
+                    # Zero out password from memory
+                    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+                }
             } else {
                 $rootDSE = New-Object System.DirectoryServices.DirectoryEntry("LDAP://RootDSE")
             }
@@ -128,11 +132,15 @@ function Get-Pre2kComputers {
         Write-Host "[*] Querying domain for computer accounts..." -ForegroundColor Cyan
 
         if ($Username -and $Password) {
-            $passwordPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
-                [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Password)
-            )
-            $directoryEntry = New-Object System.DirectoryServices.DirectoryEntry($DomainPath, $Username, $passwordPlain)
-            Write-Verbose "Using custom credentials for domain query: $Username"
+            $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Password)
+            try {
+                $passwordPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
+                $directoryEntry = New-Object System.DirectoryServices.DirectoryEntry($DomainPath, $Username, $passwordPlain)
+                Write-Verbose "Using custom credentials for domain query: $Username"
+            } finally {
+                # Zero out password from memory
+                [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+            }
         } else {
             $directoryEntry = New-Object System.DirectoryServices.DirectoryEntry($DomainPath)
             Write-Verbose "Using current user context for domain query"
@@ -188,46 +196,33 @@ function Test-Authentication {
     )
 
     try {
-        $directoryEntry = New-Object System.DirectoryServices.DirectoryEntry(
-            $DomainPath,
-            $Username,
-            $Password
-        )
-
-        # Set authentication timeout
-        $directoryEntry.AuthenticationType = [System.DirectoryServices.AuthenticationTypes]::Secure
-
-        # Create a runspace to handle timeout
-        $runspace = [runspacefactory]::CreateRunspace()
-        $runspace.Open()
-        $pipeline = $runspace.CreatePipeline()
-
-        $scriptBlock = {
-            param($entry)
+        # Use a job for timeout support (compatible with PS 3.0+)
+        $job = Start-Job -ScriptBlock {
+            param($path, $user, $pass)
             try {
+                $entry = New-Object System.DirectoryServices.DirectoryEntry($path, $user, $pass)
+                $entry.AuthenticationType = [System.DirectoryServices.AuthenticationTypes]::Secure
                 $null = $entry.NativeObject
+                $entry.Dispose()
                 return $true
             } catch {
                 return $false
             }
-        }
+        } -ArgumentList $DomainPath, $Username, $Password
 
-        $command = [System.Management.Automation.Runspaces.Command]::new($scriptBlock.ToString())
-        $command.Parameters.Add($null, $directoryEntry)
-        $pipeline.Commands.Add($command)
+        # Wait for job with timeout
+        $completed = Wait-Job -Job $job -Timeout $TimeoutSeconds
 
-        $asyncResult = $pipeline.InvokeAsync()
-        $result = $pipeline.Output.Read($TimeoutSeconds * 1000)
-
-        if ($null -eq $result) {
+        if ($null -eq $completed) {
             Write-Verbose "Authentication timeout for user: $Username"
-            $directoryEntry.Dispose()
-            $runspace.Close()
+            Stop-Job -Job $job
+            Remove-Job -Job $job -Force
             return $false
         }
 
-        $directoryEntry.Dispose()
-        $runspace.Close()
+        $result = Receive-Job -Job $job
+        Remove-Job -Job $job -Force
+
         return $result
 
     } catch [System.Runtime.InteropServices.COMException] {
@@ -251,18 +246,21 @@ function Test-Credentials {
     try {
         Write-Host "[*] Validating custom credentials..." -ForegroundColor Cyan
 
-        $passwordPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
-            [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Password)
-        )
+        $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Password)
+        try {
+            $passwordPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
+            $directoryEntry = New-Object System.DirectoryServices.DirectoryEntry($DomainPath, $Username, $passwordPlain)
 
-        $directoryEntry = New-Object System.DirectoryServices.DirectoryEntry($DomainPath, $Username, $passwordPlain)
+            # Attempt to bind
+            $null = $directoryEntry.NativeObject
+            $directoryEntry.Dispose()
 
-        # Attempt to bind
-        $null = $directoryEntry.NativeObject
-        $directoryEntry.Dispose()
-
-        Write-Host "[+] Credentials validated successfully" -ForegroundColor Green
-        return $true
+            Write-Host "[+] Credentials validated successfully" -ForegroundColor Green
+            return $true
+        } finally {
+            # Zero out password from memory
+            [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+        }
     } catch {
         Write-Host "[!] ERROR: Failed to validate custom credentials: $_" -ForegroundColor Red
         Write-Host "[!] Ensure the username and password are correct and have domain access" -ForegroundColor Red
