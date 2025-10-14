@@ -1,11 +1,11 @@
 <#
 .SYNOPSIS
-    Tests pre-Windows 2000 compatible computer accounts for weak authentication.
+    Tests all Active Directory computer accounts for pre-Windows 2000 weak authentication.
 
 .DESCRIPTION
-    Queries Active Directory for computer accounts with the pre-Windows 2000 compatible
-    flag (userAccountControl:1.2.840.113556.1.4.803:=4128) and tests for weak authentication
-    using empty passwords or passwords matching the lowercase machine name.
+    Queries Active Directory for ALL computer accounts and tests for weak authentication
+    commonly found in pre-Windows 2000 compatible accounts, using empty passwords or
+    passwords matching the lowercase machine name (first 14 characters).
 
 .PARAMETER EmptyPasswordOnly
     Only test empty passwords for discovered accounts.
@@ -24,11 +24,11 @@
 
 .EXAMPLE
     .\Invoke-Pre2k.ps1
-    Scans the current domain for vulnerable computer accounts using both empty and machine name passwords.
+    Scans ALL computers in the current domain using both empty and machine name passwords.
 
 .EXAMPLE
     .\Invoke-Pre2k.ps1 -EmptyPasswordOnly
-    Only tests empty passwords on discovered computer accounts.
+    Only tests empty passwords on all computer accounts.
 
 .EXAMPLE
     .\Invoke-Pre2k.ps1 -MachineNameOnly
@@ -148,9 +148,9 @@ function Get-Pre2kComputers {
 
         $searcher = New-Object System.DirectoryServices.DirectorySearcher($directoryEntry)
 
-        # LDAP filter for computers with pre-Windows 2000 compatible flag
-        # userAccountControl:1.2.840.113556.1.4.803:=4128
-        $searcher.Filter = "(&(objectCategory=computer)(userAccountControl:1.2.840.113556.1.4.803:=4128))"
+        # LDAP filter for ALL computer accounts
+        # Pre-Windows 2000 compatible computers don't have a reliable flag - we must test all computers
+        $searcher.Filter = "(&(objectCategory=computer)(objectClass=computer))"
         $searcher.PageSize = 1000
         $searcher.PropertiesToLoad.AddRange(@("sAMAccountName", "dNSHostName", "userAccountControl"))
 
@@ -320,27 +320,27 @@ try {
         exit 0
     }
 
-    Write-Host "[*] Testing authentication..." -ForegroundColor Cyan
     Write-Verbose "Timeout per authentication attempt: $TimeoutSeconds seconds"
 
     $vulnerableCount = 0
-    $progressCounter = 0
     $totalComputers = $computers.Count
 
-    foreach ($computer in $computers) {
-        $progressCounter++
+    # Phase 1: Test empty passwords
+    if (-not $MachineNameOnly) {
+        Write-Host "[*] Phase 1: Testing empty passwords on $totalComputers computer accounts..." -ForegroundColor Cyan
+        $progressCounter = 0
 
-        # Update progress every 50 computers
-        if ($progressCounter % 50 -eq 0 -or $progressCounter -eq $totalComputers) {
-            Write-Host "[*] Progress: $progressCounter/$totalComputers" -ForegroundColor Cyan
-        }
+        foreach ($computer in $computers) {
+            $progressCounter++
 
-        $authUsername = "$domainForAuth\$($computer.SAMAccountName)"
-        Write-Verbose "Testing computer: $($computer.SAMAccountName)"
+            # Update progress every 50 computers or on last computer
+            if ($progressCounter % 50 -eq 0 -or $progressCounter -eq $totalComputers) {
+                Write-Host "[*] Progress (Empty Password): $progressCounter/$totalComputers" -ForegroundColor Cyan
+            }
 
-        # Test empty password
-        if (-not $MachineNameOnly) {
-            Write-Verbose "  Testing empty password..."
+            $authUsername = "$domainForAuth\$($computer.SAMAccountName)"
+            Write-Verbose "Testing computer: $($computer.SAMAccountName) - empty password"
+
             $emptyPasswordSuccess = Test-Authentication -DomainPath $domainPath -Username $authUsername -Password "" -TimeoutSeconds $TimeoutSeconds
 
             if ($emptyPasswordSuccess) {
@@ -348,11 +348,25 @@ try {
                 $vulnerableCount++
             }
         }
+    }
 
-        # Test machine name password
-        if (-not $EmptyPasswordOnly) {
+    # Phase 2: Test machine name passwords
+    if (-not $EmptyPasswordOnly) {
+        Write-Host "[*] Phase 2: Testing machine name passwords on $totalComputers computer accounts..." -ForegroundColor Cyan
+        $progressCounter = 0
+
+        foreach ($computer in $computers) {
+            $progressCounter++
+
+            # Update progress every 50 computers or on last computer
+            if ($progressCounter % 50 -eq 0 -or $progressCounter -eq $totalComputers) {
+                Write-Host "[*] Progress (Machine Name Password): $progressCounter/$totalComputers" -ForegroundColor Cyan
+            }
+
+            $authUsername = "$domainForAuth\$($computer.SAMAccountName)"
             $machinePassword = Get-MachinePassword -SAMAccountName $computer.SAMAccountName
-            Write-Verbose "  Testing machine name password: $machinePassword"
+            Write-Verbose "Testing computer: $($computer.SAMAccountName) - password: $machinePassword"
+
             $machinePasswordSuccess = Test-Authentication -DomainPath $domainPath -Username $authUsername -Password $machinePassword -TimeoutSeconds $TimeoutSeconds
 
             if ($machinePasswordSuccess) {
