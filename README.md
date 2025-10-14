@@ -1,10 +1,10 @@
-# PowerShell2k - Pre-Windows 2000 Compatible Computer Account Scanner
+# Spray-2k - Pre-Windows 2000 Compatible Computer Account Scanner
 
 A production-ready tool for identifying pre-Windows 2000 compatible computer accounts in Active Directory environments. These accounts are often created with weak or default passwords, representing a significant security risk.
 
 ## Overview
 
-PowerShell2k includes two implementations for maximum flexibility:
+Spray-2k includes two implementations for maximum flexibility:
 - **PowerShell Script** (`Invoke-Pre2k.ps1`) - No external modules required
 - **C# Binary** (`Pre2k.exe`) - Cobalt Strike execute-assembly compatible
 
@@ -27,8 +27,8 @@ Both implementations query Active Directory for computer accounts with the pre-W
 ## Installation
 
 ```powershell
-git clone https://github.com/hackandbackpack/powershell2k.git
-cd powershell2k
+git clone https://github.com/hackandbackpack/spray-2k.git
+cd spray-2k
 ```
 
 No additional installation required. The PowerShell script runs directly, and the C# binary is pre-compiled.
@@ -290,8 +290,6 @@ Defenders should monitor for:
 
 ## Credits
 
-### Original Work
-
 This tool is inspired by and builds upon the excellent work of the original **[pre2k](https://github.com/garrettfoster13/pre2k)** tool by [@unsigned_sh0rt](https://github.com/garrettfoster13) (Garrett Foster) and [@Tw1sm](https://github.com/Tw1sm).
 
 The original pre2k tool demonstrated the methodology for identifying and exploiting pre-Windows 2000 computer account vulnerabilities in Active Directory environments. Their Python-based implementation provided the foundation and inspiration for this PowerShell and C# reimplementation.
@@ -300,9 +298,7 @@ The original pre2k tool demonstrated the methodology for identifying and exploit
 
 We're grateful for their research, development, and contribution to the security community. Their tool has been invaluable for penetration testers and red teamers conducting Active Directory assessments.
 
-### Additional Research
-
-Research and methodology also based on work from:
+Additional research and methodology based on work from:
 - **TrustedSec** - Pre-created computer account research
 - **Optiv** - Active Directory security assessments
 - Various security researchers in the Active Directory security community
