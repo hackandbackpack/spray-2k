@@ -1,0 +1,21 @@
+# Build outputs
+*.pdb
+*.dll
+*.cache
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+~$*
