@@ -290,11 +290,21 @@ Defenders should monitor for:
 
 ## Credits
 
-Inspired by the original [pre2k](https://github.com/garrettfoster13/pre2k) tool by @unsigned_sh0rt and @Tw1sm.
+### Original Work
 
-Research and methodology based on work from:
-- TrustedSec
-- Optiv
+This tool is inspired by and builds upon the excellent work of the original **[pre2k](https://github.com/garrettfoster13/pre2k)** tool by [@unsigned_sh0rt](https://github.com/garrettfoster13) (Garrett Foster) and [@Tw1sm](https://github.com/Tw1sm).
+
+The original pre2k tool demonstrated the methodology for identifying and exploiting pre-Windows 2000 computer account vulnerabilities in Active Directory environments. Their Python-based implementation provided the foundation and inspiration for this PowerShell and C# reimplementation.
+
+**Original Repository**: https://github.com/garrettfoster13/pre2k
+
+We're grateful for their research, development, and contribution to the security community. Their tool has been invaluable for penetration testers and red teamers conducting Active Directory assessments.
+
+### Additional Research
+
+Research and methodology also based on work from:
+- **TrustedSec** - Pre-created computer account research
+- **Optiv** - Active Directory security assessments
 - Various security researchers in the Active Directory security community
 
 ## License
