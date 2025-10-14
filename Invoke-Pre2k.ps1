@@ -287,8 +287,8 @@ function Get-MachinePassword {
 # Main execution
 try {
     Write-Verbose "Script started with parameters:"
-    Write-Verbose "  Domain: $($Domain ? $Domain : 'Current domain')"
-    Write-Verbose "  Username: $($Username ? $Username : 'Current user')"
+    Write-Verbose "  Domain: $(if ($Domain) { $Domain } else { 'Current domain' })"
+    Write-Verbose "  Username: $(if ($Username) { $Username } else { 'Current user' })"
     Write-Verbose "  EmptyPasswordOnly: $EmptyPasswordOnly"
     Write-Verbose "  MachineNameOnly: $MachineNameOnly"
     Write-Verbose "  TimeoutSeconds: $TimeoutSeconds"
