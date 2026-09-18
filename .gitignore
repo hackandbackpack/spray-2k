@@ -1,5 +1,6 @@
 # Build outputs
 *.pdb
+*.exe
 *.dll
 *.cache
 *.exe
