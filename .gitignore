@@ -2,6 +2,7 @@
 *.pdb
 *.dll
 *.cache
+*.exe
 
 # OS files
 Thumbs.db

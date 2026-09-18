@@ -31,7 +31,7 @@ git clone https://github.com/hackandbackpack/spray-2k.git
 cd spray-2k
 ```
 
-No additional installation required. The PowerShell script runs directly, and the C# binary is pre-compiled.
+No additional installation required. The PowerShell script runs directly. The C# version must be compiled from `Pre2k.cs` (see the Compilation section below); the binary is intentionally not committed to the repo.
 
 ## Usage
 
@@ -74,6 +74,8 @@ $password = Read-Host -AsSecureString -Prompt "Enter password"
 ```
 
 ### C# Version
+
+> Compile `Pre2k.cs` first (see the Compilation section); the binary is not shipped in this repo.
 
 #### Basic Usage (Current User Context)
 ```powershell
